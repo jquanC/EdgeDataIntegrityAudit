@@ -20,6 +20,7 @@ public class Benchmark {
     private static int BLOCK_NUMBER;
     private static int esNum;
     private static int EXP_TIME;
+    private static int L = 1 << 10;
 
 
     public static void main(String[] args) throws IOException {
@@ -71,7 +72,7 @@ public class Benchmark {
         FileWriter resWriter = new FileWriter(newPath);
         File sourceFile = new File(filePath);
         String fileName = sourceFile.getName();
-        String titleLine = "PARAM:      BLOCK_NUM  " + BLOCK_NUMBER + "      SAMPLED_RATE  " + SAMPLED_RATE + "        " + "esNum " + esNum + "     fileName     "+fileName +"\r\n";
+        String titleLine = "PARAM:      BLOCK_NUM  " + BLOCK_NUMBER + "      SAMPLED_RATE  " + SAMPLED_RATE + "        " + "esNum " + esNum + "     fileName     " + fileName + "\r\n";
         resWriter.write(titleLine);
 
         for (int i = 0; i < EXP_TIME; i++) {
@@ -114,7 +115,7 @@ public class Benchmark {
         //generate ChallengeData
         sTime[ithTest][2] = System.nanoTime();
         //ChallengeData[] chaDataArr = fsEDI.auditGen(esNum, Math.round(fsEDI.getBLOCK_NUMBER() * SAMPLED_RATE),key);
-        fsEDI.auditGen(esNum, Math.round(fsEDI.getBLOCK_NUMBER() * SAMPLED_RATE),key);
+        String chaFilePath = fsEDI.auditGen(esNum, Math.round(fsEDI.getBLOCK_NUMBER() * SAMPLED_RATE), key);
         time[ithTest][2] = System.nanoTime();
         time[ithTest][2] = time[ithTest][2] - sTime[ithTest][2];
 
@@ -123,38 +124,55 @@ public class Benchmark {
         ProofData[] proofData = new ProofData[esNum];
         //byte[][] selectedBlock;
 
-        Random random = new Random( key.getKeyPRF().hashCode());//实际部署时，ES直接接收挑战数据
+
         int chaLen = Math.round(fsEDI.getBLOCK_NUMBER() * SAMPLED_RATE);
         Random randomMatrix = new Random(key.getKeyMatrix().hashCode());
         byte[] MatrixA = new byte[chaLen];
         randomMatrix.nextBytes(MatrixA);
 
+        DataInputStream dataIn = new DataInputStream(new BufferedInputStream(new FileInputStream(chaFilePath)));
+        byte[][] replicaDataBlocks = fsEDI.readAllSourceBlocks(replicaPath);
+        int[][] indices = new int[L][chaLen];//注释了换成 indices 看看速度
+        int readIntNum = dataIn.available() / 4;
+        int readCount = 0;
         for (int i = 0; i < esNum; i++) {
 
-            byte[][] originalDataBlocks = fsEDI.readAllSourceBlocks(replicaPath);
+            try{
+                if (i / L == 0) { //这么做是为了尽量减少IO次数；
+                    for (int m = 0; m < L; m++) {
+                        for (int n = 0; n < chaLen; n++) {
 
-            int[] indices = new int[chaLen];//注释了换成 indices 看看速度
-            for (int j = 0; j < chaLen; j++) {
-                indices[j] = random.nextInt(BLOCK_NUMBER);
+                            if (readCount < readIntNum) { //这一次会读完;
+                                indices[m][n] = dataIn.readInt();
+                                readCount++;
+                            }
+                        }
+                    }
+                }
+
+            }catch(EOFException e){
+
             }
-            ChallengeData thisEsChaData = new ChallengeData(indices,MatrixA);
+
+
+            ChallengeData thisEsChaData = new ChallengeData(indices[i % L], MatrixA);
 
             long start = System.nanoTime();
-            proofData[i] = fsEDI.proGen(thisEsChaData, originalDataBlocks, i);
+            proofData[i] = fsEDI.proGen(thisEsChaData, replicaDataBlocks, i);
             long end = System.nanoTime();
             time[ithTest][3] = time[ithTest][3] + (end - start);
         }
         time[ithTest][3] = time[ithTest][3] / esNum;//平均每个esNum 执行proGen 的时间
-
+        dataIn.close();
         //Verify
 
         //byte[][][] allSelectedBlock = fsEDI.readAllSelectedBlocks(filePath, chaDataArr);
-       // byte[][][] allSelectedBlock = fsEDI.readAllSelectedBlocks(filePath, chaDataArr);
+        // byte[][][] allSelectedBlock = fsEDI.readAllSelectedBlocks(filePath, chaDataArr);
         byte[][] originalDataBlocks = fsEDI.readAllSourceBlocks(filePath);
 
         sTime[ithTest][4] = System.nanoTime();
-        //boolean isDataIntact = fsEDI.Verify(proofData, chaDataArr, allSelectedBlock);
-        boolean isDataIntact = fsEDI.Verify(proofData, originalDataBlocks,key);
+
+        boolean isDataIntact = fsEDI.Verify(proofData, originalDataBlocks, chaFilePath, key);
 
         time[ithTest][4] = System.nanoTime();
         time[ithTest][4] = time[ithTest][4] - sTime[ithTest][4];

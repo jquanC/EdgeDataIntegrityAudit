@@ -1,0 +1,4 @@
+PARAM:      BLOCK_NUM  1708      SAMPLED_RATE  0.1        esNum 100     fileName     cash.txt
+855000                  21400                  101238200                  109155                  16798000
+37200                  11400                  1866100                  26352                  2001000
+Program started at 2021-08-09 11:02:47 , finished at 2021-08-09 11:02:47

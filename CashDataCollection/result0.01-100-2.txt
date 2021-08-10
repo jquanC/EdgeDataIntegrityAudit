@@ -1,0 +1,4 @@
+PARAM:      BLOCK_NUM  524288      SAMPLED_RATE  0.01        esNum 100     fileName     randomFile8MB.rar
+809700                  21300                  123516700                  1531409                  179254100
+53800                  9400                  11510900                  1321075                  114457000
+Program started at 2021-08-09 11:01:26 , finished at 2021-08-09 11:01:31

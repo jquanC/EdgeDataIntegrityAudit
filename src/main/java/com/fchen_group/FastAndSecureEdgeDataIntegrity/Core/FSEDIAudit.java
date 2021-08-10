@@ -14,6 +14,7 @@ public class FSEDIAudit extends AuditComponent {
     private String filePath;
     private String replicaPath;
     private float SAMPLED_RATE;
+    private int L=1<<10; //param to control JVM heap limit
   /*  private byte[][] selectedOriginalData;
     private  byte[][] originalData;*/
 
@@ -39,7 +40,7 @@ public class FSEDIAudit extends AuditComponent {
             strBuff1.append(chars1.charAt(new Random().nextInt(chars1.length())));
             strBuff2.append(chars2.charAt(new Random().nextInt(chars2.length())));
         }
-        Key key = new Key(strBuff1.toString(),strBuff2.toString());
+        Key key = new Key(strBuff1.toString(), strBuff2.toString());
 
         System.out.println("KetGen phase finished");
         return key; //16
@@ -58,40 +59,53 @@ public class FSEDIAudit extends AuditComponent {
      * 修改为 return 一个文件路径，存储ChallengeData的;
      * 在实际网络中，发送给某个ES时，只需从文件中读
      */
-    public void auditGen(int esNum, int chaLen, Key key) {
+    public String auditGen(int esNum, int chaLen, Key key) throws IOException {
         System.out.println("start audit phase");
         /* to generate indices for all ES*/
 
         //Generator matrix
         Random randomMatrix = new Random(key.getKeyMatrix().hashCode());
         byte[] MatrixA = new byte[chaLen];
-        /* an easy implementation,generate random bytes to fill the array*/
         randomMatrix.nextBytes(MatrixA);
 
         //prepare a outputStream to store all challengeData
 
-      /*  File desktopDir = FileSystemView.getFileSystemView().getHomeDirectory();
+        File desktopDir = FileSystemView.getFileSystemView().getHomeDirectory();
         String desktopPath = desktopDir.getAbsolutePath();
         String chaDataPath = desktopPath + "\\chaData.txt";
-        BufferedOutputStream bufOut = new BufferedOutputStream(new FileOutputStream(chaDataPath));*/
+        DataOutputStream outData = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(chaDataPath)));
 
         //Random random = new Random();
         Random random = new Random(key.getKeyPRF().hashCode());
-
-        ChallengeData[] challengeSet = new ChallengeData[esNum];
-       // int[][] indices = new int[esNum][chaLen];
-        int[] indices = new int[chaLen];
-
+        //int[] indices = new int[chaLen];
+        int [][] indices = new int[L][chaLen];
 
         for (int i = 0; i < esNum; i++) {
 
             for (int j = 0; j < chaLen; j++) {
-                indices[j] = random.nextInt(BLOCK_NUMBER);
+                indices[i%L][j] = random.nextInt(BLOCK_NUMBER);
+                //outData.writeInt(indices[j]);
             }
 
-            ChallengeData  oneCha = new ChallengeData(indices, MatrixA); //just for test
+            if( i/L >=1 && i%L==0 ){
+                for(int m=0;m<L;m++){
+                    for(int n=0;n<16;n++){
+                        outData.writeInt(indices[m][n]);
+                    }
+                }
+            }
+
+            ChallengeData oneCha = new ChallengeData(indices[i%L], MatrixA); //just for test
+        }
+        //最后一次不足indices[L][chaLen]的继续写入
+
+        for(int m=0;m<L;m++){
+            for(int n=0;n<16;n++){
+                outData.writeInt(indices[m][n]);
+            }
         }
 
+        outData.close();
         /*to generate a unique Matrix ; in scheme, the Matrix is (16*16)
          * but in simply , we can use a diagonal matrix , and use a (16*1) Matrix to store the diagonal elements */
 
@@ -102,7 +116,8 @@ public class FSEDIAudit extends AuditComponent {
 
 
         System.out.println("generate challenge data finished");
-       // return challengeSet;
+        // return challengeSet;
+        return chaDataPath;
     }
 
     /**
@@ -127,7 +142,7 @@ public class FSEDIAudit extends AuditComponent {
         time = endTime - startTime;
         System.out.println("read all data into Memory need " + time + "ns");*/
 
-        System.out.println("data prepared in " + esID + " th server");
+        //System.out.println("data prepared in " + esID + " th server");
         int chaBlockNum = oneEsChaData.blockIndex.length;
         int[] indices = oneEsChaData.blockIndex;
         byte[] matrixA = oneEsChaData.matrixA;
@@ -146,25 +161,18 @@ public class FSEDIAudit extends AuditComponent {
             }
 
         }
-        System.out.println(esID + " th edge serve finished proGen");
+       // System.out.println(esID + " th edge serve finished proGen");
         return new ProofData(esID, proTag);
     }
 
     /**
      * @ original data
      */
-    public boolean Verify(ProofData[] proofData, byte[][] originalData,Key key) throws IOException {
+    public boolean Verify(ProofData[] proofData, byte[][] originalData, String chaFilePath, Key key) throws IOException {
         System.out.println("Verify phase start");
         int esNum = proofData.length;
-        int chaBlockNum = Math.round(BLOCK_NUMBER*SAMPLED_RATE);
+        int chaBlockNum = Math.round(BLOCK_NUMBER * SAMPLED_RATE);
 
-        /*//read original data
-        byte[][] originalData = new byte[BLOCK_NUMBER][SECTOR_NUMBER];
-        FileInputStream in = new FileInputStream(new File(filePath));
-        for (int i = 0; i < BLOCK_NUMBER; i++) {
-            in.read(originalData[i]);
-        }
-        in.close();*/
 
         //combine all return POI
         byte[] resCombineReturnTag = new byte[SECTOR_NUMBER];
@@ -178,30 +186,40 @@ public class FSEDIAudit extends AuditComponent {
 
         //
 
-        Random random = new Random(key.getKeyPRF().hashCode());//实际部署时，ES直接接收挑战数据
-
         Random randomMatrix = new Random(key.getKeyMatrix().hashCode());
         byte[] matrixA = new byte[chaBlockNum];
         randomMatrix.nextBytes(matrixA);
         //
 
+        DataInputStream dataIn = new DataInputStream(new BufferedInputStream(new FileInputStream(chaFilePath)));
+        int readIntNum = dataIn.available() / 4;
+        int readCount = 0;
         //calculate checking Result by original data
         byte[] checkBlock = new byte[SECTOR_NUMBER];
+        int[][] indices = new int[L][chaBlockNum];
         for (int t = 0; t < esNum; t++) {
-            //i th Challenge data
-            int[] indices = new int[chaBlockNum];
-            for (int j = 0; j < chaBlockNum; j++) {
-                indices[j] = random.nextInt(BLOCK_NUMBER);
-            }
 
+            if (t / L == 0) {
+                for (int m = 0; m < L; m++) {
+                    for (int n = 0; n < chaBlockNum; n++) {
+                        if (readCount < readIntNum) {
+                            indices[m][n] = dataIn.readInt();
+                            readCount++;
+                        }else{
+                          break;
+                        }
+                    }
+                }
+            }
 
             byte[] tag = new byte[SECTOR_NUMBER];
             byte[] temp = new byte[SECTOR_NUMBER];
             for (int i = 0; i < chaBlockNum; i++) {
 
                 for (int j = 0; j < SECTOR_NUMBER; j++) {
-                    temp[j] = Galois.multiply(matrixA[j], originalData[indices[i]][j]);//这是针对 original data的读取方法
+                    //temp[j] = Galois.multiply(matrixA[j], originalData[indices[i]][j]);//这是针对 original data的读取方法
                     //temp[j] = Galois.multiply(matrixA[j], allSelectedBlock[t][i][j]); //已经是selected的
+                    temp[j] = Galois.multiply(matrixA[j], originalData[indices[t % L][i]][j]);
                 }
                 for (int j = 0; j < SECTOR_NUMBER; j++) {
                     tag[j] = Galois.add(tag[j], temp[j]);

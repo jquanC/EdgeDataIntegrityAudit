@@ -99,18 +99,7 @@ public class FSEDIAudit extends AuditComponent {
 
     public ProofData proGen(ChallengeData oneEsChaData, byte[][] selectBlocks, int esID) throws IOException {
 
-       /* System.out.println(esID + " th edge serve start proGen");
-        long startTime, endTime, time;
-        startTime = System.nanoTime();
-        byte[][] replica = new byte[BLOCK_NUMBER][SECTOR_NUMBER];
-        FileInputStream in = new FileInputStream(new File(filePath));
-        for (int i = 0; i < BLOCK_NUMBER; i++) {
-            in.read(replica[i]);
-        }
-        in.close();
-        endTime = System.nanoTime();
-        time = endTime - startTime;
-        System.out.println("read all data into Memory need " + time + "ns");*/
+       
 
         //System.out.println("data prepared in " + esID + " th server");
         int chaBlockNum = oneEsChaData.blockIndex.length;

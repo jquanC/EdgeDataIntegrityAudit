@@ -99,7 +99,7 @@ public class FSEDIAudit extends AuditComponent {
 
     public ProofData proGen(ChallengeData oneEsChaData, byte[][] selectBlocks, int esID) throws IOException {
 
-       
+
 
         //System.out.println("data prepared in " + esID + " th server");
         int chaBlockNum = oneEsChaData.blockIndex.length;

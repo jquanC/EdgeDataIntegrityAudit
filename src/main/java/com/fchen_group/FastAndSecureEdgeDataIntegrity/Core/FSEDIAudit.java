@@ -15,7 +15,7 @@ public class FSEDIAudit extends AuditComponent {
     private String replicaPath;
     private static int CHA_LEN;
     // private float SAMPLED_RATE;
-    private int L = 1 << 10; //param to control JVM heap limit
+    //private int L = 1 << 10; //param to control JVM heap limit
   /*  private byte[][] selectedOriginalData;
     private  byte[][] originalData;*/
 

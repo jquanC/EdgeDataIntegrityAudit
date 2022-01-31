@@ -17,7 +17,7 @@ It can prevent collusion between malicious edge servers.
 Besides, we give proof of the correctness of the scheme under the standard security definition.
 The experimental results show that our solution is more efficient and safer than the state-of-art.
 
-More details can be found in the draft of our [paper](https://jquanstorage-1302225808.cos.ap-guangzhou.myqcloud.com/myfile/edgechecking.pdf), which is under further revision.
+More details can be found in the draft of our [paper](https://jquanstorage-1302225808.cos.ap-guangzhou.myqcloud.com/myfile/edgechecking_review.pdf), which is under further revision.
 
 
 

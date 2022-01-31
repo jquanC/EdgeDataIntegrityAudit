@@ -27,7 +27,7 @@ More details can be found in the draft of our [paper](https://jquanstorage-13022
 
 We use java 1.8.0_202 to develop this project and use IntelliJ IDEA and Maven to compile and manage it. 
 
-The code for the comparative experiment is stored in another repository.
+The code for the EDC-R scheme and  comparative experiment are stored in other branchs of this repository.
 
 
 
